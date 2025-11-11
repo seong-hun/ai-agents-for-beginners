@@ -3,7 +3,7 @@ import os
 from random import randint
 from typing import Awaitable, Callable
 
-from agent_framework import AgentThread, ChatAgent, FunctionInvocationContext
+from agent_framework import AgentThread, FunctionInvocationContext
 from agent_framework.openai import OpenAIChatClient
 from dotenv import load_dotenv
 
@@ -37,20 +37,6 @@ def get_random_destination() -> str:
 
     # Factory Method Pattern: Create destination selection on demand
     return destinations[randint(0, len(destinations) - 1)]
-
-
-async def process_input(
-    user_input: str | None,
-    thread: AgentThread | None,
-) -> AgentThread | None:
-    first_chunk = True
-    async for update in agent.run_stream(user_input, thread=thread):
-        if update.text:
-            if first_chunk:
-                print(f"> {'Assistant'}: ", end="", flush=True)
-                first_chunk = False
-            print(update.text, end="", flush=True)
-    print("\n")
 
 
 async def handle_streaming_intermediate_steps(
@@ -90,13 +76,30 @@ What kind of trip would you like me to help you plan today?"
 Always prioritize user preferences. If they mention a specific destination like "Bali" or "Paris," focus your planning on that location rather than suggesting alternatives.
 """
 
-agent = ChatAgent(
+agent = OpenAIChatClient(
+    base_url=os.environ.get("GITHUB_ENDPOINT"),
+    api_key=os.environ.get("GITHUB_TOKEN"),
+    model_id=os.environ.get("GITHUB_MODEL_ID"),
+).create_agent(
     name=AGENT_NAME,
-    chat_client=openai_chat_client,
     instructions=AGENT_INSTRUCTIONS,
     tools=[get_random_destination],
     middleware=[handle_streaming_intermediate_steps],
 )
+
+
+async def process_input(
+    user_input: str | None,
+    thread: AgentThread | None,
+) -> AgentThread | None:
+    first_chunk = True
+    async for update in agent.run_stream(user_input, thread=thread):
+        if update.text:
+            if first_chunk:
+                print(f"> {'Assistant'}: ", end="", flush=True)
+                first_chunk = False
+            print(update.text, end="", flush=True)
+    print("\n")
 
 
 async def main():
